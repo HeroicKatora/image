@@ -10,7 +10,7 @@ use byteorder::{LittleEndian, ReadBytesExt};
 
 use crate::color::ColorType;
 use crate::error::{ImageError, ImageResult};
-use crate::image::{self, ImageDecoder, ImageDecoderExt, Progress};
+use crate::image::{self, ImageDecoder, ImageFormat, ImageDecoderExt, Progress};
 
 const BITMAPCOREHEADER_SIZE: u32 = 12;
 const BITMAPINFOHEADER_SIZE: u32 = 40;
@@ -703,8 +703,9 @@ impl<R: Read + Seek> BmpDecoder<R> {
             },
             // PNG and JPEG not implemented yet.
             _ => {
-                return Err(ImageError::UnsupportedError(
-                    "Unsupported image type".to_string(),
+                return Err(ImageError::UnsupportedFeature(
+                    ImageFormat::Bmp,
+                    "Image type".to_string(),
                 ))
             }
         };
@@ -770,8 +771,9 @@ impl<R: Read + Seek> BmpDecoder<R> {
                 BITMAPV4HEADER_SIZE => BMPHeaderType::V4,
                 BITMAPV5HEADER_SIZE => BMPHeaderType::V5,
                 _ => {
-                    return Err(ImageError::UnsupportedError(
-                        "Unsupported Bitmap Header".to_string(),
+                    return Err(ImageError::UnsupportedFeature(
+                        ImageFormat::Bmp,
+                        "Bitmap Header".to_string(),
                     ))
                 }
             };

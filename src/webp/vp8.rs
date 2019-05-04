@@ -1169,7 +1169,8 @@ impl<R: Read> Vp8Decoder<R> {
 
         if !self.frame.keyframe {
             // 9.7 refresh golden frame and altref frame
-            return Err(ImageError::UnsupportedError(
+            return Err(ImageError::UnsupportedFormat(
+                    // FIXME: use feature with Format::Vp8 instead.
                 "Frames that are not keyframes are not supported".into()))
             // FIXME: support this?
         } else {
@@ -1190,7 +1191,8 @@ impl<R: Read> Vp8Decoder<R> {
             // 9.10 remaining frame data
             self.prob_intra = 0;
 
-            return Err(ImageError::UnsupportedError(
+            return Err(ImageError::UnsupportedFormat(
+                    // FIXME: use feature with Format::Vp8 instead.
                 "Frames that are not keyframes are not supported".into()))
             // FIXME: support this?
         } else {
@@ -1223,7 +1225,8 @@ impl<R: Read> Vp8Decoder<R> {
         };
 
         if inter_predicted {
-            return Err(ImageError::UnsupportedError(
+            return Err(ImageError::UnsupportedFormat(
+                    // FIXME: use feature with Format::Vp8 instead.
                 "VP8 inter prediction is not implemented yet".into()));
         }
 

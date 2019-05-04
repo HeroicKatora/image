@@ -13,7 +13,7 @@ use crate::Primitive;
 
 use crate::color::{ColorType, Rgb};
 use crate::error::{ImageError, ImageResult};
-use crate::image::{self, ImageDecoder, ImageDecoderExt, Progress};
+use crate::image::{self, ImageDecoder, ImageDecoderExt, ImageFormat, Progress};
 
 /// Adapter to conform to ```ImageDecoder``` trait
 #[derive(Debug)]
@@ -669,7 +669,10 @@ impl HDRMetadata {
             Some(("FORMAT", val)) => {
                 if val.trim() != "32-bit_rle_rgbe" {
                     // XYZE isn't supported yet
-                    return Err(ImageError::UnsupportedError(limit_string_len(val, 20)));
+                    return Err(ImageError::UnsupportedFeature(
+                        ImageFormat::Hdr,
+                        format!("Format {}", limit_string_len(val, 20))
+                    ));
                 }
             }
             Some(("EXPOSURE", val)) => {

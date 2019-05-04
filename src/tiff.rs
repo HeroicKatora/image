@@ -17,7 +17,7 @@ use byteorder::{NativeEndian, ByteOrder};
 
 use crate::color::{ColorType, ExtendedColorType};
 use crate::error::{ImageError, ImageResult};
-use crate::image::{ImageDecoder, ImageEncoder};
+use crate::image::{ImageDecoder, ImageEncoder, ImageFormat};
 use crate::utils::vec_u16_into_u8;
 
 /// Decoder for TIFF images.
@@ -69,7 +69,7 @@ impl ImageError {
         match err {
             tiff::TiffError::IoError(err) => ImageError::IoError(err),
             tiff::TiffError::FormatError(desc) => ImageError::FormatError(desc.to_string()),
-            tiff::TiffError::UnsupportedError(desc) => ImageError::UnsupportedError(desc.to_string()),
+            tiff::TiffError::UnsupportedError(desc) => ImageError::UnsupportedFeature(ImageFormat::Tiff, desc.to_string()),
             tiff::TiffError::LimitsExceeded => ImageError::InsufficientMemory,
         }
     }

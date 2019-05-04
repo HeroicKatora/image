@@ -205,6 +205,6 @@ impl<R: BufRead + Seek> Reader<R> {
 
     fn require_format(&mut self) -> ImageResult<ImageFormat> {
         self.format.ok_or_else(||
-            ImageError::UnsupportedError("Unable to determine image format".into()))
+            ImageError::UnsupportedFormat("Unable to determine image format".into()))
     }
 }

@@ -6,7 +6,7 @@ use std::marker::PhantomData;
 use std::mem;
 
 use crate::color::ColorType;
-use crate::image::ImageDecoder;
+use crate::image::{ImageDecoder, ImageFormat};
 use crate::error::{ImageError, ImageResult};
 
 /// JPEG decoder
@@ -130,9 +130,9 @@ impl From<jpeg::Error> for ImageError {
         use self::jpeg::Error::*;
         match err {
             Format(desc) => ImageError::FormatError(desc),
-            Unsupported(desc) => ImageError::UnsupportedError(format!("{:?}", desc)),
+            Unsupported(desc) => ImageError::UnsupportedFeature(ImageFormat::Jpeg, format!("{:?}", desc)),
             Io(err) => ImageError::IoError(err),
-            Internal(err) => ImageError::FormatError(err.description().to_owned()),
+            Internal(err) => ImageError::FormatError(err.to_string()),
         }
     }
 }

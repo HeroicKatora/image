@@ -687,7 +687,7 @@ impl DynamicImage {
             }
 
             image::ImageOutputFormat::Unsupported(msg) => {
-                Err(ImageError::UnsupportedError(msg))
+                Err(ImageError::UnsupportedFormat(msg))
             }
         }
     }

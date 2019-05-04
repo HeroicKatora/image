@@ -44,7 +44,7 @@ use crate::animation;
 use crate::buffer::{ImageBuffer, Pixel};
 use crate::color::{self, Rgba};
 use crate::error::{ImageError, ImageResult};
-use crate::image::{self, AnimationDecoder, ImageDecoder};
+use crate::image::{self, AnimationDecoder, ImageDecoder, ImageFormat};
 use num_rational::Ratio;
 
 /// GIF decoder
@@ -125,7 +125,10 @@ impl<'a, R: 'a + Read> ImageDecoder<'a> for GifDecoder<R> {
                 // See the comments inside `<GifFrameIterator as Iterator>::next` about
                 // the error handling of `from_raw`.
                 let image = ImageBuffer::from_raw(f_width, f_height, &mut *buf).ok_or_else(
-                    || ImageError::UnsupportedError("Image dimensions are too large".into())
+                    || ImageError::UnsupportedFeature(
+                        ImageFormat::Gif,
+                        "Image dimensions are too large".into(),
+                    )
                 )?;
 
                 ImageBuffer::from_fn(width, height, |x, y| {
@@ -215,7 +218,7 @@ impl<R: Read> Iterator for GifFrameIterator<R> {
         let image_buffer_raw = match ImageBuffer::from_raw(f_width, f_height, vec) {
             Some(image_buffer_raw) => image_buffer_raw,
             None => {
-                return Some(Err(ImageError::UnsupportedError(
+                return Some(Err(ImageError::FormatError(
                     "Image dimensions are too large".into(),
                 )))
             }

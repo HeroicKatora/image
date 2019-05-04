@@ -78,10 +78,10 @@ pub fn load<R: BufRead + Seek>(r: R, format: ImageFormat) -> ImageResult<Dynamic
         image::ImageFormat::Hdr => DynamicImage::from_decoder(hdr::HDRAdapter::new(BufReader::new(r))?),
         #[cfg(feature = "pnm")]
         image::ImageFormat::Pnm => DynamicImage::from_decoder(pnm::PnmDecoder::new(BufReader::new(r))?),
-        _ => Err(ImageError::UnsupportedError(format!(
-            "A decoder for {:?} is not available.",
-            format
-        ))),
+        format => Err(ImageError::UnsupportedFeature(
+            format,
+            format!("A decoder for {:?} is not available.", format),
+        )),
     }
 }
 
@@ -122,10 +122,10 @@ pub(crate) fn image_dimensions_with_format_impl<R: BufRead + Seek>(fin: R, forma
         image::ImageFormat::Pnm => {
             pnm::PnmDecoder::new(fin)?.dimensions()
         }
-        format => return Err(ImageError::UnsupportedError(format!(
-            "Image format image/{:?} is not supported.",
-            format
-        ))),
+        format => return Err(ImageError::UnsupportedFeature(
+            format,
+            format!("Image format image/{:?} is not supported.", format),
+        )),
     })
 }
 
@@ -167,7 +167,9 @@ pub(crate) fn save_buffer_impl(
         #[cfg(feature = "tiff")]
         "tif" | "tiff" => tiff::TiffEncoder::new(fout)
             .write_image(buf, width, height, color),
-        format => Err(ImageError::UnsupportedError(format!("Unsupported image format image/{:?}", format))),
+        format => Err(ImageError::UnsupportedFormat(
+            format!("Unsupported image format image/{:?}", format)
+        )),
     }
 }
 
@@ -193,7 +195,9 @@ pub(crate) fn save_buffer_with_format_impl(
         #[cfg(feature = "tiff")]
         image::ImageFormat::Tiff => tiff::TiffEncoder::new(fout)
             .write_image(buf, width, height, color),
-        _ => Err(ImageError::UnsupportedError(format!("Unsupported image format image/{:?}", format))),
+        format => Err(ImageError::UnsupportedFormat(
+            format!("Unsupported image format image/{:?}", format)
+        )),
     }
 }
 
@@ -258,7 +262,7 @@ static MAGIC_BYTES: [(&'static [u8], ImageFormat); 17] = [
 pub fn guess_format(buffer: &[u8]) -> ImageResult<ImageFormat> {
     match guess_format_impl(buffer) {
         Some(format) => Ok(format),
-        None => Err(ImageError::UnsupportedError(
+        None => Err(ImageError::UnsupportedFormat(
             "Unsupported image format".to_string(),
         )),
     }
@@ -277,9 +281,9 @@ pub(crate) fn guess_format_impl(buffer: &[u8]) -> Option<ImageFormat> {
 impl From<PathError> for ImageError {
     fn from(path: PathError) -> Self {
         match path {
-            PathError::NoExtension => ImageError::UnsupportedError(
+            PathError::NoExtension => ImageError::UnsupportedFormat(
                 "Image format could not be recognized: no extension present".into()),
-            PathError::UnknownExtension(ext) => ImageError::UnsupportedError(format!(
+            PathError::UnknownExtension(ext) => ImageError::UnsupportedFormat(format!(
                 "Image format image/{} is not recognized.", Path::new(&ext).display()))
         }
     }
