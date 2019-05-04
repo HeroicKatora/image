@@ -50,8 +50,12 @@ fn render_images() {
             // Do not fail on unsupported error
             // This might happen because the testsuite contains unsupported images
             // or because a specific decoder included via a feature.
-            Err(image::ImageError::UnsupportedError(e)) => {
+            Err(image::ImageError::UnsupportedFormat(e)) => {
                 println!("UNSUPPORTED {}: {}", path.display(), e);
+                return;
+            }
+            Err(image::ImageError::UnsupportedFeature(format, err)) => {
+                println!("UNSUPPORTED {}: {:?} {}", path.display(), format, err);
                 return;
             }
             Err(err) => panic!(format!("decoding of {:?} failed with: {}", path, err)),
@@ -161,7 +165,8 @@ fn check_references() {
             // Do not fail on unsupported error
             // This might happen because the testsuite contains unsupported images
             // or because a specific decoder included via a feature.
-            Err(image::ImageError::UnsupportedError(..)) => return,
+            Err(image::ImageError::UnsupportedFormat(..)) => return,
+            Err(image::ImageError::UnsupportedFeature(..)) => return,
             Err(err) => panic!(format!("{}", err)),
         };
 
@@ -192,6 +197,7 @@ fn check_references() {
                     let stream = io::BufReader::new(fs::File::open(&img_path).unwrap());
                     let decoder = match image::gif::GifDecoder::new(stream) {
                         Ok(decoder) => decoder,
+                        Err(image::ImageError::UnsupportedFormat(..)) => return,
                         Err(image::ImageError::UnsupportedFeature(..)) => return,
                         Err(err) => {
                             panic!(format!("decoding of {:?} failed with: {}", img_path, err))
@@ -200,6 +206,7 @@ fn check_references() {
 
                     let mut frames = match decoder.into_frames().collect_frames() {
                         Ok(frames) => frames,
+                        Err(image::ImageError::UnsupportedFormat(..)) => return,
                         Err(image::ImageError::UnsupportedFeature(..)) => return,
                         Err(err) => panic!(format!(
                             "collecting frames of {:?} failed with: {}",
@@ -228,6 +235,7 @@ fn check_references() {
                     // Do not fail on unsupported error
                     // This might happen because the testsuite contains unsupported images
                     // or because a specific decoder included via a feature.
+                    Err(image::ImageError::UnsupportedFormat(..)) => return,
                     Err(image::ImageError::UnsupportedFeature(..)) => return,
                     Err(err) => panic!(format!("decoding of {:?} failed with: {}", img_path, err)),
                 };
