@@ -1,8 +1,8 @@
 use byteorder::{LittleEndian, WriteBytesExt};
-use std::io::{self, Write};
+use std::io::Write;
 
 use crate::color::ColorType;
-use crate::error::ImageResult;
+use crate::error::{ImageError, ImageResult};
 use crate::image::ImageEncoder;
 
 use crate::png::PNGEncoder;
@@ -64,7 +64,7 @@ impl<W: Write> ImageEncoder for ICOEncoder<W> {
     }
 }
 
-fn write_icondir<W: Write>(w: &mut W, num_images: u16) -> io::Result<()> {
+fn write_icondir<W: Write>(w: &mut W, num_images: u16) -> ImageResult<()> {
     // Reserved field (must be zero):
     w.write_u16::<LittleEndian>(0)?;
     // Image type (ICO or CUR):
@@ -81,7 +81,7 @@ fn write_direntry<W: Write>(
     color: ColorType,
     data_start: u32,
     data_size: u32,
-) -> io::Result<()> {
+) -> ImageResult<()> {
     // Image dimensions:
     write_width_or_height(w, width)?;
     write_width_or_height(w, height)?;
@@ -101,13 +101,13 @@ fn write_direntry<W: Write>(
 }
 
 /// Encode a width/height value as a single byte, where 0 means 256.
-fn write_width_or_height<W: Write>(w: &mut W, value: u32) -> io::Result<()> {
+fn write_width_or_height<W: Write>(w: &mut W, value: u32) -> ImageResult<()> {
     if value < 1 || value > 256 {
-        return Err(io::Error::new(
-            io::ErrorKind::InvalidData,
+        return Err(ImageError::FormatError(
             "Invalid ICO dimensions (width and \
-             height must be between 1 and 256)",
+             height must be between 1 and 256)".to_owned()
         ));
     }
-    w.write_u8(if value < 256 { value as u8 } else { 0 })
+    w.write_u8(if value < 256 { value as u8 } else { 0 })?;
+    Ok(())
 }

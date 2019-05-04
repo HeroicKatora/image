@@ -1,5 +1,5 @@
 use byteorder::{LittleEndian, WriteBytesExt};
-use std::io::{self, Write};
+use std::io::Write;
 
 use crate::color;
 use crate::error::{ImageError, ImageResult};
@@ -101,10 +101,7 @@ impl<'a, W: Write + 'a> BMPEncoder<'a, W> {
                 self.encode_gray(image, width, height, row_pad_size, 2)?
             }
             _ => {
-                return Err(ImageError::IoError(io::Error::new(
-                    io::ErrorKind::InvalidInput,
-                    &get_unsupported_error_message(c)[..],
-                )))
+                return Err(ImageError::UnsupportedColor(c.into()));
             }
         }
 
@@ -118,7 +115,7 @@ impl<'a, W: Write + 'a> BMPEncoder<'a, W> {
         height: u32,
         row_pad_size: u32,
         bytes_per_pixel: u32,
-    ) -> io::Result<()> {
+    ) -> ImageResult<()> {
         let x_stride = bytes_per_pixel;
         let y_stride = width * x_stride;
         for row in 0..height {
@@ -149,7 +146,7 @@ impl<'a, W: Write + 'a> BMPEncoder<'a, W> {
         height: u32,
         row_pad_size: u32,
         bytes_per_pixel: u32,
-    ) -> io::Result<()> {
+    ) -> ImageResult<()> {
         let x_stride = bytes_per_pixel;
         let y_stride = width * x_stride;
         for row in 0..height {
@@ -181,7 +178,7 @@ impl<'a, W: Write + 'a> BMPEncoder<'a, W> {
         height: u32,
         row_pad_size: u32,
         bytes_per_pixel: u32,
-    ) -> io::Result<()> {
+    ) -> ImageResult<()> {
         // write grayscale palette
         for val in 0..256 {
             // each color is written as BGRA, where A is always 0 and since only grayscale is being written, B = G = R = index
@@ -211,7 +208,7 @@ impl<'a, W: Write + 'a> BMPEncoder<'a, W> {
         Ok(())
     }
 
-    fn write_row_pad(&mut self, row_pad_size: u32) -> io::Result<()> {
+    fn write_row_pad(&mut self, row_pad_size: u32) -> ImageResult<()> {
         for _ in 0..row_pad_size {
             self.writer.write_u8(0)?;
         }
@@ -232,25 +229,15 @@ impl<'a, W: Write> ImageEncoder for BMPEncoder<'a, W> {
     }
 }
 
-fn get_unsupported_error_message(c: color::ColorType) -> String {
-    format!(
-        "Unsupported color type {:?}.  Supported types: RGB(8), RGBA(8), Gray(8), GrayA(8).",
-        c
-    )
-}
-
 /// Returns a tuple representing: (dib header size, written pixel size, palette color count).
-fn get_pixel_info(c: color::ColorType) -> io::Result<(u32, u32, u32)> {
+fn get_pixel_info(c: color::ColorType) -> ImageResult<(u32, u32, u32)> {
     let sizes = match c {
         color::ColorType::Rgb8 => (BITMAPINFOHEADER_SIZE, 3, 0),
         color::ColorType::Rgba8 => (BITMAPV4HEADER_SIZE, 4, 0),
         color::ColorType::L8 => (BITMAPINFOHEADER_SIZE, 1, 256),
         color::ColorType::La8 => (BITMAPINFOHEADER_SIZE, 1, 256),
         _ => {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidInput,
-                &get_unsupported_error_message(c)[..],
-            ))
+            return Err(ImageError::UnsupportedColor(c.into()));
         }
     };
 

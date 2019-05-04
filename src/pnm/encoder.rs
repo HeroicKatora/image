@@ -1,6 +1,5 @@
 //! Encoding of PNM Images
 use std::fmt;
-use std::io;
 
 use std::io::Write;
 
@@ -9,7 +8,7 @@ use super::{ArbitraryHeader, ArbitraryTuplType, BitmapHeader, GraymapHeader, Pix
 use super::{HeaderRecord, PNMHeader, PNMSubtype, SampleEncoding};
 use crate::color::{ColorType, ExtendedColorType};
 use crate::error::{ImageError, ImageResult};
-use crate::image::ImageEncoder;
+use crate::image::{ImageEncoder, ImageFormat};
 
 use byteorder::{BigEndian, WriteBytesExt};
 
@@ -240,11 +239,9 @@ impl<W: Write> PNMEncoder<W> {
                 encoded: None,
             },
             (_, _) => {
-                // FIXME https://github.com/image-rs/image/issues/921
-                return Err(ImageError::IoError(io::Error::new(
-                    io::ErrorKind::InvalidInput,
-                    "Color type can not be represented in the chosen format",
-                )))
+                return Err(ImageError::FormatError(
+                    "Color type can not be represented in the chosen format".to_owned()
+                ))
             }
         };
 
@@ -306,10 +303,9 @@ impl<'a> CheckedImageBuffer<'a> {
                 _height: height,
                 _color: color,
             }),
-            Some(_) => Err(ImageError::IoError(io::Error::new(
-                io::ErrorKind::InvalidInput,
-                &"Image buffer does not correspond to size and colour".to_string()[..],
-            ))),
+            Some(_) => Err(ImageError::FormatError(
+                "Image buffer does not correspond to size and colour".to_owned()
+            )),
         }
     }
 }
@@ -321,10 +317,9 @@ impl<'a> UncheckedHeader<'a> {
         height: u32,
     ) -> ImageResult<CheckedDimensions<'a>> {
         if self.header.width() != width || self.header.height() != height {
-            return Err(ImageError::IoError(io::Error::new(
-                io::ErrorKind::InvalidInput,
-                "Chosen header does not match Image dimensions",
-            )));
+            return Err(ImageError::FormatError(
+                "Chosen header does not match Image dimensions".to_owned()
+            ));
         }
 
         Ok(CheckedDimensions {
@@ -349,11 +344,10 @@ impl<'a> CheckedDimensions<'a> {
             } => match color {
                 ExtendedColorType::L1 | ExtendedColorType::L8 | ExtendedColorType::L16 => (),
                 _ => {
-                    return Err(ImageError::IoError(io::Error::new(
-                        io::ErrorKind::InvalidInput,
-                        "PBM format only support luma color types",
-                    )))
-                }
+                    return Err(ImageError::FormatError(
+                        "PBM format only support luma color types".to_owned()
+                    ));
+                },
             },
             PNMHeader {
                 decoded: HeaderRecord::Graymap(_),
@@ -361,10 +355,9 @@ impl<'a> CheckedDimensions<'a> {
             } => match color {
                 ExtendedColorType::L1 | ExtendedColorType::L8 | ExtendedColorType::L16 => (),
                 _ => {
-                    return Err(ImageError::IoError(io::Error::new(
-                        io::ErrorKind::InvalidInput,
-                        "PGM format only support luma color types",
-                    )))
+                    return Err(ImageError::FormatError(
+                        "PGM format only support luma color types".into(),
+                    ));
                 }
             },
             PNMHeader {
@@ -373,10 +366,10 @@ impl<'a> CheckedDimensions<'a> {
             } => match color {
                 ExtendedColorType::Rgb8 => (),
                 _ => {
-                    return Err(ImageError::IoError(io::Error::new(
-                        io::ErrorKind::InvalidInput,
-                        "PPM format only support ExtendedColorType::Rgb8",
-                    )))
+                    return Err(ImageError::UnsupportedFeature(
+                        ImageFormat::Pnm,
+                        "PPM format only support ExtendedColorType::Rgb8".into(),
+                    ));
                 }
             },
             PNMHeader {
@@ -402,16 +395,14 @@ impl<'a> CheckedDimensions<'a> {
                 (&None, _) if depth == components => (),
                 (&Some(ArbitraryTuplType::Custom(_)), _) if depth == components => (),
                 _ if depth != components => {
-                    return Err(ImageError::IoError(io::Error::new(
-                        io::ErrorKind::InvalidInput,
+                    return Err(ImageError::FormatError(
                         format!("Depth mismatch: header {} vs. color {}", depth, components),
-                    )))
+                    ));
                 }
                 _ => {
-                    return Err(ImageError::IoError(io::Error::new(
-                        io::ErrorKind::InvalidInput,
-                        "Invalid color type for selected PAM color type",
-                    )))
+                    return Err(ImageError::FormatError(
+                        "Invalid color type for selected PAM color type".into(),
+                    ));
                 }
             },
         }
@@ -450,21 +441,18 @@ impl<'a> CheckedHeaderColor<'a> {
                 => 0xffff,
             ExtendedColorType::__Nonexhaustive => unreachable!(),
             _ => {
-                return Err(ImageError::IoError(io::Error::new(
-                    io::ErrorKind::InvalidInput,
-                    "Unsupported target color type",
-                )))
+                return Err(ImageError::UnsupportedFeature(
+                    ImageFormat::Pnm,
+                    "Encoding colors with a bit depth greater than 16".to_owned()
+                ));
             }
         };
 
         // Avoid the performance heavy check if possible, e.g. if the header has been chosen by us.
         if header_maxval < max_sample && !image.all_smaller(header_maxval) {
-            // FIXME https://github.com/image-rs/image/issues/921, No ImageError variant seems
-            // appropriate in this situation UnsupportedHeaderFormat maybe?
-            return Err(ImageError::IoError(io::Error::new(
-                io::ErrorKind::InvalidInput,
-                "Sample value greater than allowed for chosen header",
-            )));
+            return Err(ImageError::FormatError(
+                "Sample value greater than allowed for chosen header".into(),
+            ));
         }
 
         let encoding = image.encoding_for(&self.dimensions.unchecked.header.decoded);
@@ -498,7 +486,7 @@ impl<'a> CheckedHeader<'a> {
 struct SampleWriter<'a>(&'a mut dyn Write);
 
 impl<'a> SampleWriter<'a> {
-    fn write_samples_ascii<V>(self, samples: V) -> io::Result<()>
+    fn write_samples_ascii<V>(self, samples: V) -> ImageResult<()>
     where
         V: Iterator,
         V::Item: fmt::Display,
@@ -507,10 +495,11 @@ impl<'a> SampleWriter<'a> {
         for value in samples {
             write!(auto_break_writer, "{} ", value)?;
         }
-        auto_break_writer.flush()
+        auto_break_writer.flush()?;
+        Ok(())
     }
 
-    fn write_pbm_bits<V>(self, samples: &[V], width: u32) -> io::Result<()>
+    fn write_pbm_bits<V>(self, samples: &[V], width: u32) -> ImageResult<()>
     /* Default gives 0 for all primitives. TODO: replace this with `Zeroable` once it hits stable */
     where
         V: Default + Eq + Copy,
@@ -538,7 +527,8 @@ impl<'a> SampleWriter<'a> {
             line_buffer.clear();
         }
 
-        self.0.flush()
+        self.0.flush()?;
+        Ok(())
     }
 }
 
@@ -615,39 +605,32 @@ impl<'a> TupleEncoding<'a> {
                 samples: FlatSamples::U8(samples),
                 width,
             } => SampleWriter(writer)
-                .write_pbm_bits(samples, width)
-                .map_err(ImageError::IoError),
+                .write_pbm_bits(samples, width)?,
             TupleEncoding::PbmBits {
                 samples: FlatSamples::U16(samples),
                 width,
             } => SampleWriter(writer)
-                .write_pbm_bits(samples, width)
-                .map_err(ImageError::IoError),
+                .write_pbm_bits(samples, width)?,
 
             TupleEncoding::Bytes {
                 samples: FlatSamples::U8(samples),
-            } => writer.write_all(samples).map_err(ImageError::IoError),
+            } => writer.write_all(samples)?,
             TupleEncoding::Bytes {
                 samples: FlatSamples::U16(samples),
             } => samples
                 .iter()
-                .map(|&sample| {
-                    writer
-                        .write_u16::<BigEndian>(sample)
-                        .map_err(ImageError::IoError)
-                })
-                .collect(),
-
+                .map(|&sample| writer.write_u16::<BigEndian>(sample))
+                .collect::<Result<_, _>>()?,
             TupleEncoding::Ascii {
                 samples: FlatSamples::U8(samples),
             } => SampleWriter(writer)
-                .write_samples_ascii(samples.iter())
-                .map_err(ImageError::IoError),
+                .write_samples_ascii(samples.iter())?,
             TupleEncoding::Ascii {
                 samples: FlatSamples::U16(samples),
             } => SampleWriter(writer)
-                .write_samples_ascii(samples.iter())
-                .map_err(ImageError::IoError),
+                .write_samples_ascii(samples.iter())?,
         }
+
+        Ok(())
     }
 }

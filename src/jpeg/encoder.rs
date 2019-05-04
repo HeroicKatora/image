@@ -4,7 +4,7 @@ use byteorder::{BigEndian, WriteBytesExt};
 use crate::error::{ImageError, ImageResult};
 use crate::math::utils::clamp;
 use num_iter::range_step;
-use std::io::{self, Write};
+use std::io::{Write};
 
 use crate::color;
 use crate::image::ImageEncoder;
@@ -174,7 +174,7 @@ impl<'a, W: Write + 'a> BitWriter<'a, W> {
         }
     }
 
-    fn write_bits(&mut self, bits: u16, size: u8) -> io::Result<()> {
+    fn write_bits(&mut self, bits: u16, size: u8) -> ImageResult<()> {
         if size == 0 {
             return Ok(());
         }
@@ -197,11 +197,11 @@ impl<'a, W: Write + 'a> BitWriter<'a, W> {
         Ok(())
     }
 
-    fn pad_byte(&mut self) -> io::Result<()> {
+    fn pad_byte(&mut self) -> ImageResult<()> {
         self.write_bits(0x7F, 7)
     }
 
-    fn huffman_encode(&mut self, val: u8, table: &[(u8, u16)]) -> io::Result<()> {
+    fn huffman_encode(&mut self, val: u8, table: &[(u8, u16)]) -> ImageResult<()> {
         let (size, code) = table[val as usize];
 
         if size > 16 {
@@ -217,7 +217,7 @@ impl<'a, W: Write + 'a> BitWriter<'a, W> {
         prevdc: i32,
         dctable: &[(u8, u16)],
         actable: &[(u8, u16)],
-    ) -> io::Result<i32> {
+    ) -> ImageResult<i32> {
         // Differential DC encoding
         let dcval = block[0];
         let diff = dcval - prevdc;
@@ -263,7 +263,7 @@ impl<'a, W: Write + 'a> BitWriter<'a, W> {
         Ok(dcval)
     }
 
-    fn write_segment(&mut self, marker: u8, data: Option<&[u8]>) -> io::Result<()> {
+    fn write_segment(&mut self, marker: u8, data: Option<&[u8]>) -> ImageResult<()> {
         self.w.write_all(&[0xFF])?;
         self.w.write_all(&[marker])?;
 
@@ -537,7 +537,7 @@ impl<'a, W: Write> JPEGEncoder<'a, W> {
         width: usize,
         height: usize,
         bpp: usize,
-    ) -> io::Result<()> {
+    ) -> ImageResult<()> {
         let mut yblock = [0u8; 64];
         let mut y_dcprev = 0;
         let mut dct_yblock = [0i32; 64];
@@ -572,7 +572,7 @@ impl<'a, W: Write> JPEGEncoder<'a, W> {
         width: usize,
         height: usize,
         bpp: usize,
-    ) -> io::Result<()> {
+    ) -> ImageResult<()> {
         let mut y_dcprev = 0;
         let mut cb_dcprev = 0;
         let mut cr_dcprev = 0;

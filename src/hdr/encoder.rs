@@ -1,8 +1,8 @@
 use crate::color::Rgb;
 use crate::error::ImageResult;
 use crate::hdr::{rgbe8, RGBE8Pixel, SIGNATURE};
-use std::io::{Result, Write};
 use std::cmp::Ordering;
+use std::io::Write;
 
 /// Radiance HDR encoder
 pub struct HDREncoder<W: Write> {
@@ -220,8 +220,9 @@ fn rle_compress(data: &[u8], rle: &mut Vec<u8>) {
     }
 }
 
-fn write_rgbe8<W: Write>(w: &mut W, v: RGBE8Pixel) -> Result<()> {
-    w.write_all(&[v.c[0], v.c[1], v.c[2], v.e])
+fn write_rgbe8<W: Write>(w: &mut W, v: RGBE8Pixel) -> ImageResult<()> {
+    w.write_all(&[v.c[0], v.c[1], v.c[2], v.e])?;
+    Ok(())
 }
 
 /// Converts ```Rgb<f32>``` into ```RGBE8Pixel```
