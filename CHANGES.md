@@ -10,14 +10,26 @@ Rust image aims to be a pure-Rust implementation of various popular image format
 
 ### Version 0.22
 
-- Remove potential for unsafety (introduced through dependency), see #885
-- Fixes `ImageBuffer` index calculation for very, very large images
+- Note the website and blog: [image-rs.org][1] and [blog.image-rs.org][2]
+- The associated constants of `Pixel` trait are actual constants
 - Implemented incremental png loading
+- Add method to save an `ImageBuffer`/`DynamicImage` with specified format
 - Add function to retrieve image dimensions without loading full image
 - Allow different image types in overlay and replace
-- Fix some crashes while parsing specific incomplete pnm images
+
+[1]: https://www.image-rs.org
+[2]: https://blog.image-rs.org
+
+### Version 0.21.2
+
+- Fixes `ImageBuffer` index calculation for very, very large images
 - Added comprehensive fuzzing for the pam image types
+- Fix some crashes while parsing specific incomplete pnm images
 - The example in README was updated once again
+
+### Version 0.21.1
+
+- Remove potential for unsafety (introduced through dependency), see #885
 
 ### Version 0.21
 
