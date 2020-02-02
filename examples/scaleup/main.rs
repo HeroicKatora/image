@@ -28,14 +28,13 @@ impl fmt::Display for Elapsed {
 
 fn main() {
     let tiny = image::open("examples/scaleup/tinycross.png").unwrap();
-    for &(name, filter) in [
+    for &(name, filter) in &[
         ("near", FilterType::Nearest),
         ("tri", FilterType::Triangle),
         ("xcmr", FilterType::CatmullRom),
         ("ygauss", FilterType::Gaussian),
         ("zlcz2", FilterType::Lanczos3),
-    ].into_iter()
-    {
+    ] {
         let timer = Instant::now();
         let scaled = tiny.resize(32, 32, filter);
         println!("Scaled by {} in {}", name, Elapsed::from(&timer));
