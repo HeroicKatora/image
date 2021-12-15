@@ -159,6 +159,11 @@ pub mod buffer {
         Rows,
         RowsMut,
     };
+
+    pub use crate::bytes::{
+        ByteBuffer,
+        ColorLayout,
+    };
 }
 
 // Math utils
@@ -357,6 +362,7 @@ pub mod webp {
 mod animation;
 #[path = "buffer.rs"]
 mod buffer_;
+mod bytes;
 mod color;
 mod dynimage;
 mod image;
