@@ -1,3 +1,5 @@
+use core::num::NonZeroUsize;
+
 use crate::{ImageError, ImageResult};
 use crate::error::{ImageFormatHint, UnsupportedError, UnsupportedErrorKind};
 use crate::image::{GenericImageView as _, GenericImage as _};
@@ -60,12 +62,34 @@ pub struct ColorLayout {
     pub height: u32,
 }
 
-#[repr(C)]
+/// A private, inner type for layouts.
+/// We do not want to expose the struct- or enum-ness of this type. If we are to expose it to the
+/// outside (e.g. for the sake of layout comparison and manipulation) it should be wrapped and
+/// renamed.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 struct Layout {
+    /// The total byte usage of this layout.
     len: usize,
-    pixel_width: u32,
-    pixel_height: u32,
+    /// The first plane of the image.
+    /// For texel based images this is the only plane containing texel chunks in a matrix.
+    main_plane: SamplePlane,
+    /// The individual image plane parameters if they exist.
+    planes: [Option<SamplePlane>; 3],
+    /// Width in pixels.
+    width: u32,
+    /// Height in pixels.
+    height: u32,
+    /// Number of channels of the color type.
+    /// This equals the number of planes in a planar layout.
+    channels: u8,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+struct SamplePlane {
+    channel_stride: NonZeroUsize,
+    width_stride: NonZeroUsize,
+    height_stride: NonZeroUsize,
+    offset: usize,
 }
 
 impl ImageBytes {
@@ -104,7 +128,6 @@ impl ImageBytes {
     {
         let color = <P as Pixel>::COLOR_TYPE;
 
-
         if !img.flat().has_aliased_samples() {
             // Great, we have a standard pixel matrix.
             let layout = Layout::with_strides(img.flat().layout);
@@ -120,9 +143,13 @@ impl ImageBytes {
 
             let layout = layout.unwrap_or_else(|| address_space_error());
             let mut buffer = Self::with_bytes(layout, &[], color.into());
+            let layout = buffer.layout.layout_of(&buffer.layout.main_plane);
 
             for (x, y, c) in img.pixels() {
-                todo!()
+                let start = layout.in_bounds_index(0, x, y);
+                let data = c.channels().as_bytes();
+                buffer.as_bytes_mut()[start..][..data.len()]
+                    .copy_from_slice(data);
             }
 
             buffer
@@ -134,7 +161,7 @@ impl ImageBytes {
     /// Note: The bytes are aligned stricter than alignment `1`, however the exact details are not
     /// considered to be stable.
     pub fn as_bytes(&self) -> &[u8] {
-        cast_slice(&self.buffer)
+        &cast_slice(&self.buffer)[..self.layout.len]
     }
 
     /// Get a mutable reference to all raw bytes of the image.
@@ -142,24 +169,26 @@ impl ImageBytes {
     /// Note: The bytes are aligned stricter than alignment `1`, however the exact details are not
     /// considered to be stable.
     pub fn as_bytes_mut(&mut self) -> &mut [u8] {
-        cast_slice_mut(&mut self.buffer)
+        &mut cast_slice_mut(&mut self.buffer)[..self.layout.len]
     }
 
     /// Get the number of pixels horizontally.
     pub fn width(&self) -> u32 {
-        self.layout.pixel_width
+        self.layout.width
     }
 
     /// Get the number of pixels vertically.
     pub fn height(&self) -> u32 {
-        self.layout.pixel_height
+        self.layout.height
     }
 
-    /// Get the number of bytes needed per pixel, if the pixel were represented individually.
-    ///
-    /// For the sake of this calculation, each pixel will be padded to a whole byte.
-    pub fn bytes_per_pixel(&self) -> u8  {
-        todo!("Calculate a 'normalized' color.")
+    fn equivalent_color_type(&self) -> ColorType {
+        use ExtendedColorType::*;
+        match self.color {
+            L1 | L2 | L4 | L8 => ColorType::L8,
+            La1 | La2 | La4 | La8 => ColorType::La8,
+            _ => todo!(),
+        }
     }
 
     /// Overwrite pixel contents with the right-hand-side.
@@ -215,21 +244,50 @@ impl Layout {
     /// A row-major matrix of pixel texels.
     fn with_row_matrix(layout: ColorLayout) -> Option<Self> {
         let len = layout.byte_len()?;
-        Some(Layout {
-            len,
-            pixel_width: layout.width,
-            pixel_height: layout.height,
-        })
+        let channels = layout.color.channel_count();
+        let layout = SampleLayout::row_major_packed(channels, layout.width, layout.height);
+        Some(Self::with_strides(layout))
     }
 
+    /// From a pre-determined matrix layout, single plane.
+    /// Must not have any aliased pixels and be valid for memory.
     fn with_strides(layout: SampleLayout) -> Self {
-        // Yes, this isn't in-bounds. It's fine. See [SampleLayout::min_length] for details.
-        // This is more efficient since we assume it fits in memory.
-        let len = layout.in_bounds_index(0, layout.width, layout.height);
+        let len = layout.min_length()
+            .expect("called on non-aliased, in-memory layout");
         Layout {
             len,
-            pixel_width: layout.width,
-            pixel_height: layout.height,
+            main_plane: Self::plane_of(&layout),
+            planes: [None; 3],
+            channels: layout.channels,
+            width: layout.width,
+            height: layout.height,
+        }
+    }
+
+    fn plane_of(layout: &SampleLayout) -> SamplePlane {
+        let channel_stride = NonZeroUsize::new(layout.channel_stride)
+            .expect("zero width stride is forbidden aliased layout");
+        let width_stride = NonZeroUsize::new(layout.width_stride)
+            .expect("zero width stride is forbidden aliased layout");
+        let height_stride = NonZeroUsize::new(layout.height_stride)
+            .expect("zero height stride is forbidden aliased layout");
+        SamplePlane {
+            channel_stride,
+            width_stride,
+            height_stride,
+            offset: 0,
+        }
+    }
+
+    /// Turn a plane into a full layout.
+    fn layout_of(&self, plane: &SamplePlane) -> SampleLayout {
+        SampleLayout {
+            channels: self.channels,
+            width: self.width,
+            height: self.height,
+            channel_stride: plane.channel_stride.get(),
+            width_stride: plane.width_stride.get(),
+            height_stride: plane.height_stride.get(),
         }
     }
 }
@@ -242,4 +300,66 @@ fn byte_len_as_max_align(bytes: usize) -> usize {
 #[cold]
 fn address_space_error() -> ! {
     panic!("too large for address space.")
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::flat::FlatSamples; 
+    use crate::{DynamicImage, GenericImageView, Rgba, RgbaImage};
+
+    use super::ImageBytes;
+
+    #[test]
+    fn dyn_layout() {
+        let dynimg = DynamicImage::ImageRgba8(RgbaImage::from_fn(13, 17, |x, y| {
+            let (x, y) = (x as u8, y as u8);
+            Rgba::<u8>([x, y, x.wrapping_add(y), x.wrapping_sub(y),])
+        }));
+
+        let (width, height) = dynimg.dimensions();
+        let bytes = ImageBytes::from(&dynimg);
+
+        assert_eq!(bytes.width(), width);
+        assert_eq!(bytes.height(), height);
+        assert_eq!(dynimg.as_bytes(), bytes.as_bytes());
+    }
+
+    #[test]
+    fn flat_layout() {
+        let dynimg = DynamicImage::ImageRgba8(RgbaImage::from_fn(13, 17, |x, y| {
+            let (x, y) = (x as u8, y as u8);
+            Rgba::<u8>([x, y, x.wrapping_add(y), x.wrapping_sub(y),])
+        }));
+
+        let samples = dynimg.as_flat_samples_u8()
+            .expect("u8 image");
+        let view = samples
+            .as_view::<Rgba<u8>>()
+            .expect("valid view");
+
+        let (width, height) = dynimg.dimensions();
+        let bytes = ImageBytes::with_view(view);
+
+        assert_eq!(bytes.width(), width);
+        assert_eq!(bytes.height(), height);
+        assert_eq!(dynimg.as_bytes(), bytes.as_bytes());
+    }
+
+
+    #[test]
+    fn flat_aliased() {
+        let color = Rgba([0, 1, 2, 3]);
+
+        let samples = FlatSamples::with_monocolor(&color, 13, 17);
+        let view = samples
+            .as_view::<Rgba<u8>>()
+            .expect("valid view");
+
+        let (width, height) = view.dimensions();
+        let bytes = ImageBytes::with_view(view);
+
+        assert_eq!(bytes.width(), width);
+        assert_eq!(bytes.height(), height);
+        assert!(samples.as_slice() != bytes.as_bytes());
+    }
 }

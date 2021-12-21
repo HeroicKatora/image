@@ -161,7 +161,7 @@ pub mod buffer {
     };
 
     pub use crate::bytes::{
-        ByteBuffer,
+        ImageBytes,
         ColorLayout,
     };
 }
