@@ -1,4 +1,6 @@
 //! Contains the generic `ImageBuffer` struct.
+pub(crate)mod canvas;
+
 use num_traits::Zero;
 use std::fmt;
 use std::marker::PhantomData;

@@ -159,6 +159,8 @@ pub mod buffer {
         ConvertBuffer, EnumeratePixels, EnumeratePixelsMut, EnumerateRows, EnumerateRowsMut,
         Pixels, PixelsMut, Rows, RowsMut,
     };
+
+    pub use crate::buffer_::canvas::{Canvas, Layout};
 }
 
 // Math utils
@@ -249,7 +251,7 @@ pub mod codecs {
 }
 
 mod animation;
-#[path = "buffer.rs"]
+#[path = "buffer/mod.rs"]
 mod buffer_;
 mod color;
 mod dynimage;
