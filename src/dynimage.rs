@@ -557,6 +557,14 @@ impl DynamicImage {
         ))
     }
 
+    /// Return this image's pixels as a mutable native endian byte slice.
+    pub fn as_bytes_mut(&mut self) -> &mut [u8] {
+        // we can do this because every variant contains an `ImageBuffer<_, Vec<_>>`
+        dynamic_map!(*self, |ref mut image_buffer| bytemuck::cast_slice_mut(
+            image_buffer.inner_pixels_mut()
+        ))
+    }
+
     // TODO: choose a name under which to expose?
     fn inner_bytes(&self) -> &[u8] {
         // we can do this because every variant contains an `ImageBuffer<_, Vec<_>>`
